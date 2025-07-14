@@ -1,0 +1,72 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.10
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.10
+    container_name: logstash
+    environment:
+      - "XPACK_MONITORING_ENABLED=false"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "50000:50000"
+    depends_on:
+      - elasticsearch
+      - websocket-server
+
+  api-server:
+    build: .
+    container_name: api-server
+    ports:
+      - "5000:5000"
+    depends_on:
+      - logstash
+      - mysql-db
+    restart: always
+
+  websocket-server:
+    build: ./websocket-server
+    container_name: websocket-server
+    ports:
+      - "8001:8001"
+    restart: always
+
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: subway_system
+      MYSQL_USER: subway_user
+      MYSQL_PASSWORD: subway_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+
+volumes:
+  esdata:
+    driver: local
+  dbdata:
+    driver: local
+
